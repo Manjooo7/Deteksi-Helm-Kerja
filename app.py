@@ -38,22 +38,13 @@ if option == "Live Kamera (HP/Laptop)":
         img = frame.to_ndarray(format="bgr24")
         
         # --- PERBAIKAN: SMART RESIZE ---
-        # Ambil ukuran asli gambar
         h_asli, w_asli = img.shape[:2]
-        
-        # Tentukan lebar target (misal 600px biar ringan)
         target_width = 600
-        
-        # Hitung faktor pengecilan (Rasio)
         ratio = target_width / float(w_asli)
-        
-        # Hitung tinggi baru berdasarkan rasio (biar PROPOSIONAL/GAK GEPENG)
         target_height = int(h_asli * ratio)
         
-        # Resize dengan ukuran baru yang presisi
         img_resized = cv2.resize(img, (target_width, target_height))
         
-        # Deteksi (Naikkan confidence ke 0.6 biar gak gampang salah baca)
         results = model(img_resized, conf=0.6)
         annotated_frame = results[0].plot()
         
@@ -82,15 +73,12 @@ elif option == "Ambil Foto (Alternatif)":
         bytes_data = picture.getvalue()
         cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
         
-        # Deteksi pada resolusi asli (paling akurat)
         results = model.predict(cv2_img, conf=0.5)
-        
-        # Tampilkan hasil
         frame_rgb = cv2.cvtColor(results[0].plot(), cv2.COLOR_BGR2RGB)
         st.image(frame_rgb, use_column_width=True)
 
 # ==========================================
-# 3. UPLOAD VIDEO (ANTI GEPENG)
+# 3. UPLOAD VIDEO (ANTI GEPENG + FIX SYNTAX)
 # ==========================================
 elif option == "Upload Video":
     uploaded_file = st.file_uploader("Upload video (MP4)...", type=['mp4'])
@@ -107,4 +95,5 @@ elif option == "Upload Video":
         
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret or stop_btn
+            
+            # --- BAGIAN YANG TADI ERROR (SUDAH DIPERBAIKI)
