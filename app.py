@@ -11,7 +11,7 @@ import numpy as np
 st.set_page_config(page_title="Deteksi Helm Proyek", page_icon="👷", layout="centered")
 st.title("👷 Sistem Deteksi K3: Helm Keselamatan")
 st.write("Aplikasi ini menggunakan YOLOv8 untuk mendeteksi penggunaan helm pada pekerja."
-
+         
 # --- LOAD MODEL ---
 @st.cache_resource
 def load_model():
@@ -38,16 +38,15 @@ if option == "Live Kamera (HP/Laptop)":
         img = frame.to_ndarray(format="bgr24")
         
         # --- LOGIKA ANTI GEPENG ---
-        # Kita hitung rasio aspeknya dulu
         h_asli, w_asli = img.shape[:2]
         target_width = 600 # Lebar ideal
         ratio = target_width / float(w_asli)
         target_height = int(h_asli * ratio)
         
-        # Resize sesuai rasio (agar wajah tidak lonjong/gepeng)
+        # Resize sesuai rasio
         img_resized = cv2.resize(img, (target_width, target_height))
         
-        # Deteksi
+        # Deteksi (Confidence 0.6)
         results = model(img_resized, conf=0.6)
         annotated_frame = results[0].plot()
         
@@ -81,54 +80,48 @@ elif option == "Ambil Foto (Alternatif)":
         st.image(frame_rgb, use_column_width=True)
 
 # ==========================================
-# 3. UPLOAD VIDEO (FIX BUG LAYAR HITAM)
+# 3. UPLOAD VIDEO (FIXED & STABIL)
 # ==========================================
 elif option == "Upload Video":
     uploaded_file = st.file_uploader("Upload video (MP4)...", type=['mp4'])
     
     if uploaded_file is not None:
-        # Simpan file sementara
         tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') 
         tfile.write(uploaded_file.read())
         tfile.flush()
-        tfile.close() # Wajib tutup dulu sebelum dibaca OpenCV
+        tfile.close()
         
         cap = cv2.VideoCapture(tfile.name)
         
         if not cap.isOpened():
-            st.error("Gagal membuka video. Format file mungkin tidak didukung server.")
+            st.error("Gagal membuka video.")
         else:
             st_frame = st.empty()
-            
-            # Tombol Stop dengan Key unik agar tidak crash
             stop_btn = st.button("⏹️ Stop Video")
             
             while cap.isOpened():
                 ret, frame = cap.read()
                 
-                # Jika video habis atau tombol stop ditekan -> Berhenti
+                # Cek Stop
                 if not ret or stop_btn:
                     break
                 
-                # Resize ringan (480p) agar upload video lancar di Cloud
+                # Resize
                 h, w = frame.shape[:2]
                 target_w = 480 
                 ratio = target_w / float(w)
                 target_h = int(h * ratio)
-                
                 frame = cv2.resize(frame, (target_w, target_h))
                 
                 # Deteksi
                 results = model.predict(frame, conf=0.5, verbose=False)
                 res_plotted = results[0].plot()
                 
-                # Tampilkan
+                # Tampil
                 frame_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
                 st_frame.image(frame_rgb, channels="RGB", use_column_width=True)
             
             cap.release()
             
-        # Bersihkan file sampah
         try: os.unlink(tfile.name) 
         except: pass
-
