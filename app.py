@@ -3,27 +3,28 @@ import streamlit as st
 from ultralytics import YOLO
 import tempfile
 import os
+import numpy as np # Kita butuh ini untuk proses foto
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Deteksi Helm Proyek", page_icon="👷")
 st.title("👷 Sistem Deteksi K3: Helm Keselamatan")
-st.write("Aplikasi ini menggunakan YOLOv8 untuk mendeteksi penggunaan helm pada pekerja.")
 
 # --- LOAD MODEL ---
 MODEL_PATH = 'helm_yolo.pt' 
 
 if not os.path.exists(MODEL_PATH):
-    st.error(f"File model '{MODEL_PATH}' tidak ditemukan. Pastikan file ada di folder yang sama!")
+    st.error(f"File model '{MODEL_PATH}' tidak ditemukan.")
 else:
     model = YOLO(MODEL_PATH)
 
     # --- PILIHAN SUMBER ---
-    option = st.selectbox("Pilih Sumber Deteksi:", ("Upload Video", "Gunakan Webcam"))
+    option = st.selectbox("Pilih Metode:", ("Upload Video", "Ambil Foto (Webcam)"))
 
     # ==========================================
-    # LOGIKA UPLOAD VIDEO
+    # 1. LOGIKA UPLOAD VIDEO (Tetap Sama)
     # ==========================================
     if option == "Upload Video":
+        st.info("💡 Metode ini paling direkomendasikan untuk demo real-time.")
         uploaded_file = st.file_uploader("Upload video proyek (mp4/avi)...", type=['mp4', 'avi', 'mov'])
         
         if uploaded_file is not None:
@@ -31,17 +32,21 @@ else:
             tfile.write(uploaded_file.read())
             
             cap = cv2.VideoCapture(tfile.name)
-            
-            # Tombol Stop untuk Video
             stop_button = st.button("⏹️ Stop Video")
-            
             st_frame = st.empty()
+            
+            # Counter untuk skip frame biar cloud gak berat
+            frame_count = 0
             
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret or stop_button:
                     break
                 
+                frame_count += 1
+                if frame_count % 3 != 0: # Skip frame biar agak ngebut di cloud
+                    continue
+
                 # Deteksi
                 results = model.predict(frame, conf=0.45)
                 res_plotted = results[0].plot()
@@ -53,49 +58,26 @@ else:
             cap.release()
 
     # ==========================================
-    # LOGIKA WEBCAM (FITUR STOP DITAMBAHKAN)
+    # 2. LOGIKA KAMERA KHUSUS CLOUD
     # ==========================================
-    elif option == "Gunakan Webcam":
-        st.write("---")
+    elif option == "Ambil Foto (Webcam)":
+        st.write("### 📸 Ambil Foto Diri")
+        st.warning("Karena aplikasi berjalan di Cloud Server, fitur Live Video diganti dengan 'Ambil Foto' agar kompatibel dengan browser HP/Laptop.")
         
-        # Pilihan Kamera
-        cam_options = {
-            "Kamera Utama (Default)": 0,
-            "Kamera Eksternal 1": 1,
-            "Kamera Eksternal 2": 2
-        }
-        selected_cam_name = st.selectbox("Pilih Kamera:", list(cam_options.keys()))
-        cam_index = cam_options[selected_cam_name]
+        # Widget Kamera bawaan Streamlit (Support Cloud)
+        picture = st.camera_input("Klik tombol di bawah untuk ambil foto")
         
-        # Checkbox Utama
-        run = st.checkbox('Buka Kamera')
-        
-        if run:
-            # === FITUR BARU: TOMBOL STOP DI SINI ===
-            stop_webcam = st.button("⏹️ Stop Kamera")
+        if picture:
+            # 1. Baca data gambar
+            bytes_data = picture.getvalue()
             
-            st_frame = st.empty()
-            cap = cv2.VideoCapture(cam_index)
+            # 2. Ubah ke format yang dimengerti OpenCV
+            cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
             
-            if not cap.isOpened():
-                st.error(f"Gagal membuka kamera index {cam_index}.")
-            else:
-                while run:
-                    ret, frame = cap.read()
-                    
-                    # Logika Berhenti: Jika gagal baca frame ATAU tombol stop ditekan
-                    if not ret or stop_webcam:
-                        break
-                    
-                    # Deteksi
-                    results = model.predict(frame, conf=0.5)
-                    res_plotted = results[0].plot()
-                    
-                    frame_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-                    st_frame.image(frame_rgb, channels="RGB")
-                
-                cap.release()
-                
-                # Pesan konfirmasi jika tombol stop ditekan
-                if stop_webcam:
-                    st.success("Kamera dihentikan.")
+            # 3. Deteksi dengan YOLO
+            results = model.predict(cv2_img, conf=0.5)
+            res_plotted = results[0].plot()
+            
+            # 4. Tampilkan Hasil
+            frame_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+            st.image(frame_rgb, caption="Hasil Deteksi AI", use_column_width=True)
