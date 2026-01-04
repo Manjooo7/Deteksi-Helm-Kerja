@@ -26,30 +26,41 @@ except Exception as e:
 # --- PILIHAN MENU ---
 st.write("---")
 option = st.selectbox("Pilih Metode Deteksi:", 
-                     ("Live Kamera (Stream)", "Ambil Foto (Alternatif)", "Upload Video"))
+                     ("Live Kamera (HP/Laptop)", "Ambil Foto (Alternatif)", "Upload Video"))
 
 # ==========================================
-# 1. LIVE KAMERA (WebRTC) - DENGAN STUN LEBIH BANYAK
+# 1. LIVE KAMERA (ANTI GEPENG)
 # ==========================================
-if option == "Live Kamera (Stream)":
-    st.info("💡 Jika loading terus, berarti jaringan memblokir. Silakan pindah ke menu 'Ambil Foto'.")
+if option == "Live Kamera (HP/Laptop)":
+    st.info("💡 Support mode Portrait (HP) & Landscape (Laptop).")
     
     def video_frame_callback(frame):
         img = frame.to_ndarray(format="bgr24")
-        img_resized = cv2.resize(img, (640, 480))
         
-        results = model(img_resized, conf=0.5)
+        # --- PERBAIKAN: SMART RESIZE ---
+        # Ambil ukuran asli gambar
+        h_asli, w_asli = img.shape[:2]
+        
+        # Tentukan lebar target (misal 600px biar ringan)
+        target_width = 600
+        
+        # Hitung faktor pengecilan (Rasio)
+        ratio = target_width / float(w_asli)
+        
+        # Hitung tinggi baru berdasarkan rasio (biar PROPOSIONAL/GAK GEPENG)
+        target_height = int(h_asli * ratio)
+        
+        # Resize dengan ukuran baru yang presisi
+        img_resized = cv2.resize(img, (target_width, target_height))
+        
+        # Deteksi (Naikkan confidence ke 0.6 biar gak gampang salah baca)
+        results = model(img_resized, conf=0.6)
         annotated_frame = results[0].plot()
         
         return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
 
-    # Konfigurasi Server STUN Ganda (Biar Tembus Firewall)
     rtc_config = {
-        "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},
-            {"urls": ["stun:stun1.l.google.com:19302"]},
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-        ]
+        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
     }
 
     webrtc_streamer(
@@ -62,26 +73,24 @@ if option == "Live Kamera (Stream)":
     )
 
 # ==========================================
-# 2. AMBIL FOTO (SOLUSI ANTI-MACET)
+# 2. AMBIL FOTO (BACKUP)
 # ==========================================
 elif option == "Ambil Foto (Alternatif)":
     st.write("### 📸 Mode Foto Statis")
-    st.warning("Gunakan mode ini jika Live Stream tidak muncul karena gangguan sinyal/firewall.")
-    
-    picture = st.camera_input("Ambil Foto untuk Deteksi")
-    
+    picture = st.camera_input("Ambil Foto")
     if picture:
         bytes_data = picture.getvalue()
         cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
         
+        # Deteksi pada resolusi asli (paling akurat)
         results = model.predict(cv2_img, conf=0.5)
-        res_plotted = results[0].plot()
         
-        frame_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-        st.image(frame_rgb, caption="Hasil Deteksi", use_column_width=True)
+        # Tampilkan hasil
+        frame_rgb = cv2.cvtColor(results[0].plot(), cv2.COLOR_BGR2RGB)
+        st.image(frame_rgb, use_column_width=True)
 
 # ==========================================
-# 3. UPLOAD VIDEO (YANG SUDAH DIPERBAIKI)
+# 3. UPLOAD VIDEO (ANTI GEPENG)
 # ==========================================
 elif option == "Upload Video":
     uploaded_file = st.file_uploader("Upload video (MP4)...", type=['mp4'])
@@ -98,16 +107,4 @@ elif option == "Upload Video":
         
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret or stop_btn:
-                break
-            
-            frame = cv2.resize(frame, (640, 480))
-            results = model.predict(frame, conf=0.45, verbose=False)
-            res_plotted = results[0].plot()
-            
-            frame_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-            st_frame.image(frame_rgb, channels="RGB", use_column_width=True)
-            
-        cap.release()
-        try: os.unlink(tfile.name) 
-        except: pass
+            if not ret or stop_btn
