@@ -9,7 +9,8 @@ import numpy as np
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Deteksi Helm Proyek", page_icon="👷", layout="centered")
-st.title("👷 Real-Time Safety Detection")
+st.title("👷 Sistem Deteksi K3: Helm Keselamatan")
+st.write("Aplikasi ini menggunakan YOLOv8 untuk mendeteksi penggunaan helm pada pekerja."
 
 # --- LOAD MODEL ---
 @st.cache_resource
@@ -130,3 +131,4 @@ elif option == "Upload Video":
         # Bersihkan file sampah
         try: os.unlink(tfile.name) 
         except: pass
+
